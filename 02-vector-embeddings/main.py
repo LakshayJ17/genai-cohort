@@ -22,5 +22,5 @@ result = genai.embed_content(
     content="First genai class - getting vector embeddings"        # Input text to be embedded
 )
 
-# Print the embedding vector (list of floats)
+# Print the embedding vector
 print(result['embedding'])
