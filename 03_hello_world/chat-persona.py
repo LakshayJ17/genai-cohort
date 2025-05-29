@@ -97,8 +97,9 @@ response = client.chat.completions.create(
     model="gemini-2.0-flash",
     messages=[
         {"role": "assistant", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": "Teach me Python OOPS concepts please"},
-
+        {"role": "user", "content": "How are you sir?"},
+        {"role": "assistant", "content": "Hey there! I'm doing pretty good, thanks for asking! Just here, ready to break down some tech and help make your developer life a little easier. How about you? Ready to tackle some interesting challenges today? Let's crush it! 🚀"},
+        {"role": "user", "content": "Explain to me OOPS in python like explaining to a beginner"},
     ]
 )
 
