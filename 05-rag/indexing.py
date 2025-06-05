@@ -1,19 +1,23 @@
-from langchain_community.document_loaders import PyPDFLoader
-from pathlib import Path
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
+from pathlib import Path
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_qdrant import QdrantVectorStore
 
-load_dotenv()
 
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+
+# Indexing / Ingestion - Loading data
 pdf_path = Path(__file__).parent / "nodejs.pdf"
-api_key = os.getenv("GEMINI_API_KEY")
 
 loader = PyPDFLoader(file_path=pdf_path)
-docs = loader.load()
+docs = loader.load() # Read PDF File
 
+
+# Chunking
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=1000,
     chunk_overlap=400
@@ -21,10 +25,14 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 split_docs = text_splitter.split_documents(documents=docs)
 
-embedding_model = genai.embed_content(
-    model="models/embedding-001",                                  # Specify the embedding model
-    content=split_docs
+
+# Vector embeddings
+embedding_model = OpenAIEmbeddings(
+    model="text-embedding-3-large",
+    openai_api_key=api_key
 )
+
+# Using [embedding_model] , create embeddings of [split_docs] and store in db
 
 vector_store = QdrantVectorStore.from_documents(
     documents=split_docs,
