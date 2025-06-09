@@ -14,7 +14,7 @@ api_key = os.getenv("OPENAI_API_KEY")
 pdf_path = Path(__file__).parent / "nodejs.pdf"
 
 loader = PyPDFLoader(file_path=pdf_path)
-docs = loader.load() # Read PDF File
+docs = loader.load()  # Read PDF File
 
 
 # Chunking
