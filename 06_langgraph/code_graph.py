@@ -11,9 +11,8 @@ load_dotenv()
 
 client = OpenAI()
 
+
 # pydantic is like zod (in python)
-
-
 class ClassifyMessageResponse(BaseModel):
     is_coding_question: bool
 
@@ -49,6 +48,8 @@ def classify_message(state: State):
     is_coding_question = response.choices[0].message.parsed.is_coding_question
     state["is_coding_question"] = is_coding_question
 
+    print("CLASSIFY MESSAGE")
+
     return state
 
 
@@ -72,6 +73,7 @@ def general_query(state: State):
 
     state["llm_result"] = response.choices[0].message.content
 
+    print("GENERAL QUERY")
     return state
 
 
@@ -92,6 +94,7 @@ def coding_query(state: State):
 
     state["llm_result"] = response.choices[0].message.content
 
+    print("CODING QUERY")
     return state
 
 
@@ -118,6 +121,8 @@ def coding_validate_query(state: State):
     )
 
     state["accuracy_percentage"] = response.choices[0].message.parsed.accuracy_percentage
+
+    print("ACCURACY CHECK")
     return state
 
 
@@ -150,8 +155,11 @@ def main():
         "llm_result": None
     }
 
-    response = graph.invoke(_state)
-    print("Response : ", response)
+    # response = graph.invoke(_state)
+    # print("Response : ", response)
+
+    for event in graph.stream(_state):
+        print("Event", event)
 
 
 main()
