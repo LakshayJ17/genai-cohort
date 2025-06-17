@@ -12,79 +12,78 @@ load_dotenv()
 client = OpenAI()
 
 
-class ClassifyCrucialOver(BaseModel):
-    is_critical_over: bool
-
-
-class MatchState(TypedDict):
+class State(TypedDict):
     match_context: str
     is_critical_over: bool | None
     selected_bowler: str | None
 
 
-def analyze_match(state: MatchState):
+class ClassifyCrucialOver(BaseModel):
+    is_critical_over: bool
+
+
+def analyze_match(state: State):
     match_context = state["match_context"]
 
     SYSTEM_PROMPT = """
-    You are a cricket strategist. Your job is to decide whether the final over is a pressure situation for the bowling team.
-    Rules:
-    - If runs needed <= 12 and balls left <= 6, mark it as a pressure situation.
-    - Otherwise, it's not considered pressure.
+    You are a Cricket Strategist. You will given a match situation and Your job is to decide whether the current over is Crucial Over or Not from perspective of Bowling Team.
 
-    Return your answer strictly in JSON format:
-    {
-    "is_critical_over": true or false
-    }
-"""
-
+    Return the response in specified JSON BOOLEAN only
+    """
 
     response = client.beta.chat.completions.parse(
-        model="gpt-4.1-nano",
+        model="gpt-4.1",
         response_format=ClassifyCrucialOver,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": match_context}
+            {"role": "user", "content":  match_context}
         ]
     )
 
-    state["is_critical_over"] = response.choices[0].message.parsed.is_critical_over
+    is_critical_over = response.choices[0].message.parsed.is_critical_over
+
+    state["is_critical_over"] = is_critical_over
+
     return state
 
 
-def route_by_pressure(state: MatchState) -> Literal["critical_case", "normal_case"]:
-    return "critical_case" if state["is_critical_over"] else "normal_case"
+def route_query(state: State) -> Literal["critical_over", "normal_over"]:
+    is_critical = state["is_critical_over"]
+
+    if is_critical:
+        return "critical_over"
+    return "normal_over"
 
 
-def critical_case(state: MatchState):
+def critical_over(state: State):
     state["selected_bowler"] = "Bumrah"
     return state
 
 
-def normal_case(state: MatchState):
-    state["selected_bowler"] = "Chahal"
+def normal_over(state: State):
+    state["selected_bowler"] = "Kuldeep"
     return state
 
 
-graph_builder = StateGraph(MatchState)
+graph_builder = StateGraph(State)
 
 graph_builder.add_node("analyze_match", analyze_match)
-graph_builder.add_node("critical_case", critical_case)
-graph_builder.add_node("normal_case", normal_case)
+graph_builder.add_node("critical_over", critical_over)
+graph_builder.add_node("normal_over", normal_over)
 
-graph_builder.add_conditional_edges("analyze_match", route_by_pressure)
 
 graph_builder.add_edge(START, "analyze_match")
-graph_builder.add_edge("critical_case", END)
-graph_builder.add_edge("normal_case", END)
+graph_builder.add_conditional_edges("analyze_match", route_query)
+graph_builder.add_edge("critical_over", END)
+graph_builder.add_edge("normal_over", END)
 
 graph = graph_builder.compile()
 
 
 def main():
-    context = input(
-        "🏏 Enter match situation (e.g., 12 runs in 6 balls, spinner-friendly pitch): ")
+    context = input("Enter the match situation (e.g 12 runs in 6 balls) : ")
 
-    _state: MatchState = {
+    _state: State = {
         "match_context": context,
         "is_critical_over": None,
         "selected_bowler": None
