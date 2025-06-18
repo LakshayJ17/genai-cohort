@@ -3,14 +3,25 @@ from typing import Annotated
 from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, START, END
 from langchain.chat_models import init_chat_model
-# from langchain_core.tools import tool
+from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from dotenv import load_dotenv
+from langgraph.types import interrupt, Command
+import json
 
 load_dotenv()
 
-tools = []
+
+@tool()
+def human_assistance(query: str) -> str:
+    """Request assistance from a human"""
+    human_response = interrupt(
+        {"query": query})  # This saves the state in DB and kills the graph
+    return human_response["data"]
+
+
+tools = [human_assistance]
 
 
 class State(TypedDict):
@@ -44,21 +55,58 @@ def create_chat_graph(checkpointer):
     return graph_builder.compile(checkpointer=checkpointer)
 
 
-def main():
+def user_chat():
     DB_URI = "mongodb://admin:admin@mongodb:27017"
-    config = {"configurable": {"thread_id": "10"}}
+    config = {"configurable": {"thread_id": "20"}}
 
     with MongoDBSaver.from_conn_string(DB_URI) as mongo_checkpointer:
         graph_with_cp = create_chat_graph(mongo_checkpointer)
 
-        user_input = input("> ")
-        state = State(
-            messages=[{"role": "user", "content": user_input}]
-        )
+        while True:
+            user_input = input("> ")
+            state = State(
+                messages=[{"role": "user", "content": user_input}]
+            )
 
-        for event in graph_with_cp.stream(state, config, stream_mode="values"):
+            for event in graph_with_cp.stream(state, config, stream_mode="values"):
+                if "messages" in event:
+                    event["messages"][-1].pretty_print()
+
+
+
+def admin_call():
+    DB_URI = "mongodb://admin:admin@mongodb:27017"
+    config = {"configurable": {"thread_id": "20"}}
+
+    with MongoDBSaver.from_conn_string(DB_URI) as mongo_checkpointer:
+        graph_with_cp = create_chat_graph(mongo_checkpointer)
+
+        state = graph_with_cp.get_state(config=config)
+        # Admin will check the last message
+        last_message = state.values['messages'][-1]
+
+        tool_calls = last_message.additional_kwargs.get("tool_calls", [])
+
+        user_query = None
+
+        for call in tool_calls:
+            if call.get("function", {}).get("name") == "human_assistance":
+                args = call["function"].get("arguments", "{}")
+                try:
+                    args_dict = json.loads(args)
+                    user_query = args_dict.get("query")
+                except json.JSONDecodeError:
+                    print("Failed to decode function arguments.")
+
+        print("User Has a Query", user_query)
+        solution = input("> ")
+
+        resume_command = Command(resume={"data": solution})
+
+        for event in graph_with_cp.stream(resume_command, config, stream_mode="values"):
             if "messages" in event:
                 event["messages"][-1].pretty_print()
 
 
-main()
+user_chat()
+# admin_call()
